@@ -1,13 +1,26 @@
 "use client"
 
-import React, { useState, useRef } from "react"
+import React, { useState, useRef, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { AddEditCourseDialog } from "@/components/add-edit-course-dialog"
 import { CourseCell } from "@/components/course-cell"
 import { Course, ScheduleCell } from "@/types/schedule"
 import { Download } from 'lucide-react'
 import domtoimage from 'dom-to-image'
-import { DragDropContext, Droppable, Draggable, DropResult } from 'react-beautiful-dnd'
+import dynamic from 'next/dynamic'
+
+const DragDropContext = dynamic(
+  () => import('react-beautiful-dnd').then(mod => mod.DragDropContext),
+  {ssr: false}
+)
+const Droppable = dynamic(
+  () => import('react-beautiful-dnd').then(mod => mod.Droppable),
+  {ssr: false}
+)
+const Draggable = dynamic(
+  () => import('react-beautiful-dnd').then(mod => mod.Draggable),
+  {ssr: false}
+)
 
 const timeSlots = [
   "08:00-09:20",
@@ -34,7 +47,12 @@ export default function Schedule() {
   const [selectedCell, setSelectedCell] = useState<ScheduleCell | null>(null)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [isDownloading, setIsDownloading] = useState(false)
+  const [isDragDisabled, setIsDragDisabled] = useState(true)
   const scheduleRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    setIsDragDisabled(false)
+  }, [])
 
   const handleCellClick = (timeSlot: string, day: string) => {
     setSelectedCell({ timeSlot, day, course: null })
@@ -77,7 +95,7 @@ export default function Schedule() {
     }
   }
 
-  const onDragEnd = (result: DropResult) => {
+  const onDragEnd = (result: any) => {
     if (!result.destination) return
 
     const { source, destination } = result
@@ -204,7 +222,7 @@ export default function Schedule() {
                             onClick={() => !cell?.course && handleCellClick(timeSlot, day)}
                           >
                             {cell?.course && (
-                              <Draggable draggableId={`${day}-${timeSlot}`} index={0}>
+                              <Draggable draggableId={`${day}-${timeSlot}`} index={0} isDragDisabled={isDragDisabled}>
                                 {(provided) => (
                                   <div
                                     ref={provided.innerRef}
@@ -213,7 +231,6 @@ export default function Schedule() {
                                   >
                                     <CourseCell
                                       course={cell.course}
-                                      onClick={() => {}}
                                       onDelete={() => handleDeleteCourse(timeSlot, day)}
                                       onEdit={() => handleEditCourse(timeSlot, day)}
                                     />
