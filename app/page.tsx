@@ -1,131 +1,125 @@
 "use client"
 
-import React, { useState, useRef, useEffect } from "react"
+import React, { useState, useRef, useCallback } from "react"
 import { Button } from "@/components/ui/button"
-import { AddEditCourseDialog } from "@/components/add-edit-course-dialog"
 import { CourseCell } from "@/components/course-cell"
-import { Course, ScheduleCell } from "@/types/schedule"
+import { GlobalSearch } from "@/components/global-search"
+import { ShareDialog } from "@/components/share-dialog"
+import { Layout } from "@/components/layout"
+import { Course, CourseSchedule } from "@/data/courses"
 import { Download } from 'lucide-react'
 import domtoimage from 'dom-to-image'
-import dynamic from 'next/dynamic'
-
-const DragDropContext = dynamic(
-  () => import('react-beautiful-dnd').then(mod => mod.DragDropContext),
-  {ssr: false}
-)
-const Droppable = dynamic(
-  () => import('react-beautiful-dnd').then(mod => mod.Droppable),
-  {ssr: false}
-)
-const Draggable = dynamic(
-  () => import('react-beautiful-dnd').then(mod => mod.Draggable),
-  {ssr: false}
-)
+import { AddEditCourseDialog } from "@/components/add-edit-course-dialog"
 
 const timeSlots = [
-  "08:00-09:20",
-  "09:30-10:50",
-  "11:00-12:20",
-  "12:30-01:50",
-  "02:00-03:20",
-  "03:30-04:50",
-  "05:00-06:20",
+  "08:00 AM-09:20 AM", "09:30 AM-10:50 AM", "11:00 AM-12:20 PM", "12:30 PM-01:50 PM",
+  "02:00 PM-03:20 PM", "03:30 PM-04:50 PM", "05:00 PM-06:20 PM"
 ]
 
-const days = [
-  "Sunday",
-  "Monday",
-  "Tuesday",
-  "Wednesday",
-  "Thursday",
-  "Friday",
-  "Saturday",
-]
+const days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]
+
+interface ScheduleCell {
+  timeSlot: string;
+  day: string;
+  course: Course | null;
+  scheduleType: "theory" | "lab" | null;
+}
 
 export default function Schedule() {
   const [schedule, setSchedule] = useState<ScheduleCell[]>([])
-  const [selectedCell, setSelectedCell] = useState<ScheduleCell | null>(null)
-  const [dialogOpen, setDialogOpen] = useState(false)
   const [isDownloading, setIsDownloading] = useState(false)
-  const [isDragDisabled, setIsDragDisabled] = useState(true)
   const scheduleRef = useRef<HTMLDivElement>(null)
+  const [dialogOpen, setDialogOpen] = useState(false)
+  const [editingCell, setEditingCell] = useState<ScheduleCell | null>(null)
 
-  useEffect(() => {
-    setIsDragDisabled(false)
+  const hideDownloadElements = useCallback(() => {
+    const elements = document.querySelectorAll('.download-hide')
+    elements.forEach(el => {
+      if (el instanceof HTMLElement) {
+        el.style.display = 'none'
+      }
+    })
   }, [])
 
-  const handleCellClick = (timeSlot: string, day: string) => {
-    setSelectedCell({ timeSlot, day, course: null })
-    setDialogOpen(true)
-  }
+  const showDownloadElements = useCallback(() => {
+    const elements = document.querySelectorAll('.download-hide')
+    elements.forEach(el => {
+      if (el instanceof HTMLElement) {
+        el.style.display = ''
+      }
+    })
+  }, [])
 
-  const handleAddEditCourse = (course: Course) => {
-    if (selectedCell) {
-      setSchedule((prev) => {
-        const existingIndex = prev.findIndex(
-          (cell) =>
-            cell.timeSlot === selectedCell.timeSlot && cell.day === selectedCell.day
-        )
-        if (existingIndex >= 0) {
-          return prev.map((cell, index) =>
-            index === existingIndex ? { ...cell, course } : cell
-          )
-        }
-        return [...prev, { ...selectedCell, course }]
-      })
-      setDialogOpen(false)
-    }
-  }
-
-  const handleDeleteCourse = (timeSlot: string, day: string) => {
+  const handleDeleteCourse = useCallback((timeSlot: string, day: string) => {
     setSchedule((prev) =>
       prev.filter(
         (cell) => !(cell.timeSlot === timeSlot && cell.day === day)
       )
     )
-  }
+  }, [])
 
-  const handleEditCourse = (timeSlot: string, day: string) => {
-    const cellToEdit = schedule.find(
-      (cell) => cell.timeSlot === timeSlot && cell.day === day
+  const handleAddCourseFromSearch = useCallback((course: Course) => {
+    const dayMapping: Record<string, string> = {
+      Su: "Sunday",
+      Mo: "Monday",
+      Tu: "Tuesday",
+      We: "Wednesday",
+      Th: "Thursday",
+      Fr: "Friday",
+      Sa: "Saturday",
+    }
+  
+    course.schedule.forEach(slot => {
+      const timeSlot = slot.time
+  
+      if (timeSlot) {
+        console.log(timeSlot)
+        const fullDay = dayMapping[slot.day] // Convert day abbreviation to full name
+        if (fullDay) {
+          setSchedule(prev => [
+            ...prev,
+            { timeSlot, day: fullDay, course, scheduleType: slot.type }
+          ])
+          
+        }
+      }
+    })
+  }, [timeSlots, days])
+  
+
+  const handleCellClick = useCallback((timeSlot: string, day: string) => {
+    const existingCell = schedule.find(
+      (c) => c.timeSlot === timeSlot && c.day === day
     )
-    if (cellToEdit) {
-      setSelectedCell(cellToEdit)
-      setDialogOpen(true)
-    }
-  }
+    setEditingCell(existingCell || { timeSlot, day, course: null, scheduleType: null })
+    setDialogOpen(true)
+  }, [schedule])
 
-  const onDragEnd = (result: any) => {
-    if (!result.destination) return
-
-    const { source, destination } = result
-    const [sourceDay, sourceTime] = source.droppableId.split('-')
-    const [destDay, destTime] = destination.droppableId.split('-')
-
-    if (sourceDay === destDay && sourceTime !== destTime) {
+  const handleAddEditCourse = useCallback((course: Course, scheduleType: "theory" | "lab") => {
+    if (editingCell) {
       setSchedule((prev) => {
-        const courseToMove = prev.find(
-          (cell) => cell.day === sourceDay && cell.timeSlot === sourceTime
+        const existingIndex = prev.findIndex(
+          (cell) =>
+            cell.timeSlot === editingCell.timeSlot && cell.day === editingCell.day
         )
-        if (!courseToMove) return prev
-
-        const updatedSchedule = prev.filter(
-          (cell) => !(cell.day === sourceDay && cell.timeSlot === sourceTime)
-        )
-
-        return [
-          ...updatedSchedule,
-          { ...courseToMove, timeSlot: destTime }
-        ]
+        if (existingIndex >= 0) {
+          return prev.map((cell, index) =>
+            index === existingIndex ? { ...cell, course, scheduleType } : cell
+          )
+        }
+        return [...prev, { ...editingCell, course, scheduleType }]
       })
+      setDialogOpen(false)
+      setEditingCell(null)
     }
-  }
+  }, [editingCell])
 
-  const downloadAsImage = async () => {
+  const downloadAsImage = useCallback(async () => {
     if (!scheduleRef.current || isDownloading) return
     
     try {
       setIsDownloading(true)
+      hideDownloadElements()
       
       const element = scheduleRef.current
       
@@ -148,7 +142,7 @@ export default function Schedule() {
       }
       
       const dataUrl = await domtoimage.toPng(element, {
-        bgcolor: '#ffffff',
+        bgcolor: '#011126',
         style: {
           transform: 'none',
         },
@@ -173,90 +167,97 @@ export default function Schedule() {
     } catch (error) {
       console.error('Failed to download schedule:', error)
     } finally {
+      showDownloadElements()
       setIsDownloading(false)
     }
-  }
+  }, [hideDownloadElements, showDownloadElements, isDownloading])
 
   return (
-    <div className="p-2 md:p-6 max-w-full mx-auto">
-      <div className="flex flex-col md:flex-row justify-between items-center mb-4 md:mb-6 space-y-2 md:space-y-0">
-        <h1 className="text-xl md:text-2xl font-bold">Class Schedule</h1>
-        <Button 
-          onClick={downloadAsImage} 
-          className="w-full md:w-auto"
-          disabled={isDownloading}
-        >
-          <Download className="mr-2 h-4 w-4" />
-          {isDownloading ? 'Downloading...' : 'Download Schedule'}
-        </Button>
-      </div>
-      <div
-        ref={scheduleRef}
-        className="rounded-lg border bg-white text-black shadow-sm"
-      >
-        <div className="overflow-x-auto">
-          <DragDropContext onDragEnd={onDragEnd}>
-            <div className="grid grid-cols-[auto_repeat(7,1fr)] min-w-[800px]">
-              <div className="p-2 font-medium border-b border-r text-xs md:text-sm">Time/Day</div>
-              {days.map((day) => (
-                <div key={day} className="p-2 font-medium border-b text-center text-xs md:text-sm">
-                  {day}
-                </div>
-              ))}
-              {timeSlots.map((timeSlot) => (
-                <React.Fragment key={timeSlot}>
-                  <div className="p-2 font-medium border-b border-r whitespace-nowrap text-xs md:text-sm">
-                    {timeSlot}
-                  </div>
-                  {days.map((day) => {
-                    const cell = schedule.find(
-                      (c) => c.timeSlot === timeSlot && c.day === day
-                    )
-                    return (
-                      <Droppable key={`${day}-${timeSlot}`} droppableId={`${day}-${timeSlot}`}>
-                        {(provided) => (
-                          <div
-                            ref={provided.innerRef}
-                            {...provided.droppableProps}
-                            className="border-b border-r h-20 md:h-24"
-                            onClick={() => !cell?.course && handleCellClick(timeSlot, day)}
-                          >
-                            {cell?.course && (
-                              <Draggable draggableId={`${day}-${timeSlot}`} index={0} isDragDisabled={isDragDisabled}>
-                                {(provided) => (
-                                  <div
-                                    ref={provided.innerRef}
-                                    {...provided.draggableProps}
-                                    {...provided.dragHandleProps}
-                                  >
-                                    <CourseCell
-                                      course={cell.course}
-                                      onDelete={() => handleDeleteCourse(timeSlot, day)}
-                                      onEdit={() => handleEditCourse(timeSlot, day)}
-                                    />
-                                  </div>
-                                )}
-                              </Draggable>
-                            )}
-                            {provided.placeholder}
-                          </div>
-                        )}
-                      </Droppable>
-                    )
-                  })}
-                </React.Fragment>
-              ))}
+    <Layout>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="space-y-6">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 download-hide">
+            <h1 className="text-2xl font-bold text-white">Class Schedule</h1>
+            <div className="flex items-center gap-2 w-full sm:w-auto download-hide">
+              <Button 
+                onClick={downloadAsImage} 
+                variant="outline"
+                className="w-full sm:w-auto"
+                disabled={isDownloading}
+              >
+                <Download className="mr-2 h-4 w-4" />
+                {isDownloading ? 'Downloading...' : 'Download'}
+              </Button>
+              <ShareDialog />
             </div>
-          </DragDropContext>
+          </div>
+
+          <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center download-hide">
+            <GlobalSearch onAddCourse={handleAddCourseFromSearch} />
+            <Button 
+              className="bg-blue-600 hover:bg-blue-700 text-white font-semibold w-full sm:w-auto px-5"
+              size="sm"
+            >
+              Smart Scheduler
+            </Button>
+          </div>
+
+          <div
+            className="rounded-lg border border-white/10 bg-white/5 backdrop-blur-sm text-white shadow-sm"
+          >
+            <div ref={scheduleRef}>
+            <div className="overflow-x-auto">
+              <div className="grid grid-cols-[auto_repeat(7,1fr)] min-w-[1000px]">
+                <div className="p-2 px-9 font-medium border-b border-r border-white/10 text-xs md:text-sm text-center">
+                  Time/Day
+                </div>
+                {days.map((day) => (
+                  <div key={day} className="p-2 px-9 font-medium border-b border-white/10 text-center text-xs md:text-sm">
+                    {day}
+                  </div>
+                ))}
+                {timeSlots.map((timeSlot) => (
+                  <React.Fragment key={timeSlot}>
+                    <div className="p-2 text-center font-medium border-b border-r border-white/10 whitespace-nowrap text-xs md:text-sm">
+                      {timeSlot}
+                    </div>
+                    {days.map((day) => {
+                      const cell = schedule.find(
+                        (c) => c.timeSlot === timeSlot && c.day === day
+                      )
+                      return (
+                        <div
+                          key={`${timeSlot}-${day}`}
+                          className="border-b border-r border-white/10 h-20"
+                          
+                        >
+                          <CourseCell
+                            course={cell?.course ?? null}
+                            scheduleType={cell?.scheduleType ?? null}
+                            timeSlot = {timeSlot}
+                            day ={day}
+                            onDelete={() => handleDeleteCourse(timeSlot, day)}
+                            onClickBlank={() => handleCellClick(timeSlot, day)}
+                          />
+                        </div>
+                      )
+                    })}
+                  </React.Fragment>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
         </div>
       </div>
       <AddEditCourseDialog
         open={dialogOpen}
         onOpenChange={setDialogOpen}
         onSubmit={handleAddEditCourse}
-        initialData={selectedCell?.course || undefined}
+        initialData={editingCell?.course}
+        scheduleType={editingCell?.scheduleType}
       />
-    </div>
+    </Layout>
   )
 }
 

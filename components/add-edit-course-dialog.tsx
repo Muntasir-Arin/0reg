@@ -15,59 +15,77 @@ import {
 } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Course } from "@/types/schedule"
+import { Course } from "@/data/courses"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm } from "react-hook-form"
 import * as z from "zod"
 import { useEffect } from "react"
 
 const formSchema = z.object({
-  name: z.string().min(1, "Course name is required"),
+  courseCode: z.string().min(1, "Course code is required"),
   section: z.string().min(1, "Section is required"),
-  room: z.string().min(1, "Room number is required"),
-  type: z.enum(['theory', 'lab']),
+  faculty: z.string().min(1, "Faculty is required"),
+  scheduleType: z.enum(['theory', 'lab']),
 })
 
 interface AddEditCourseDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  onSubmit: (data: Course) => void
+  onSubmit: (data: Course, scheduleType: "theory" | "lab") => void
   initialData?: Course
+  scheduleType?: "theory" | "lab" | null
 }
 
-export function AddEditCourseDialog({ open, onOpenChange, onSubmit, initialData }: AddEditCourseDialogProps) {
+export function AddEditCourseDialog({ open, onOpenChange, onSubmit, initialData, scheduleType }: AddEditCourseDialogProps) {
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
-    defaultValues: initialData || {
-      name: "",
-      section: "",
-      room: "",
-      type: 'theory',
+    defaultValues: {
+      courseCode: initialData?.courseCode || "",
+      section: initialData?.section || "",
+      faculty: initialData?.faculty || "",
+      scheduleType: scheduleType || "theory",
     },
   })
 
   useEffect(() => {
     if (open && initialData) {
-      form.reset(initialData)
+      form.reset({
+        courseCode: initialData.courseCode,
+        section: initialData.section,
+        faculty: initialData.faculty,
+        scheduleType: scheduleType || "theory",
+      })
     }
-  }, [open, initialData, form])
+  }, [open, initialData, scheduleType, form])
+
+  const handleSubmit = (data: z.infer<typeof formSchema>) => {
+    onSubmit(
+      {
+        ...initialData,
+        courseCode: data.courseCode,
+        section: data.section,
+        faculty: data.faculty,
+      } as Course,
+      data.scheduleType
+    )
+  }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[425px]">
+    <Dialog open={open} onOpenChange={onOpenChange} >
+      <DialogContent className="lg:max-w-[425px] transition-all duration-200">
         <DialogHeader>
           <DialogTitle>{initialData ? 'Edit Course' : 'Add Course'}</DialogTitle>
         </DialogHeader>
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+          <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
             <FormField
               control={form.control}
-              name="name"
+              name="courseCode"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Course Name</FormLabel>
+                  <FormLabel>Course Code</FormLabel>
                   <FormControl>
-                    <Input placeholder="Enter course name" {...field} />
+                    <Input placeholder="Enter course code" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -88,12 +106,12 @@ export function AddEditCourseDialog({ open, onOpenChange, onSubmit, initialData 
             />
             <FormField
               control={form.control}
-              name="room"
+              name="faculty"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Room Number</FormLabel>
+                  <FormLabel>Faculty</FormLabel>
                   <FormControl>
-                    <Input placeholder="Enter room number" {...field} />
+                    <Input placeholder="Enter faculty" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -101,10 +119,10 @@ export function AddEditCourseDialog({ open, onOpenChange, onSubmit, initialData 
             />
             <FormField
               control={form.control}
-              name="type"
+              name="scheduleType"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Course Type</FormLabel>
+                  <FormLabel>Schedule Type</FormLabel>
                   <FormControl>
                     <Tabs
                       value={field.value}
