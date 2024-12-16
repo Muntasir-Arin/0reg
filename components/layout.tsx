@@ -9,18 +9,6 @@ export function Layout({ children }: { children: React.ReactNode }) {
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div className="absolute -top-[40rem] left-1/2 -translate-x-1/2 w-[80rem] h-[80rem] bg-blue-500/20 rounded-full blur-3xl" />
       </div>
-
-      {/* Grainy overlay */}
-      <div className="absolute inset-0 opacity-50 pointer-events-none hidden xl:block">
-        <div 
-          className="absolute inset-0 opacity-15"
-          style={{
-            backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 3000 3000' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%' height='100%' filter='url(%23noiseFilter)'/%3E%3C/svg%3E")`,
-            backgroundRepeat: 'repeat',
-            mixBlendMode: 'soft-light',
-          }}
-        ></div>
-      </div>
       
       {/* Navigation */}
       <nav className="border-b border-white/10 backdrop-blur-sm relative z-10">
