@@ -11,7 +11,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
       </div>
 
       {/* Grainy overlay */}
-      <div className="absolute inset-0 opacity-50 pointer-events-none hidden sm:block">
+      <div className="absolute inset-0 opacity-50 pointer-events-none hidden xl:block">
         <div 
           className="absolute inset-0 opacity-15"
           style={{
